@@ -168,6 +168,10 @@ class Game {
     const rawDt = Math.min(0.05, (time - this.lastTime) / 1000);
     this.lastTime = time;
 
+    if (this.touchControls) {
+      this.touchControls.enabled = (this.state === GameState.PLAYING || this.state === GameState.PAUSED);
+    }
+
     this.input.update();
     this.renderer.updateTime(rawDt);
 
@@ -987,7 +991,8 @@ class Game {
 
     // Combo UI
     if (typeof this.renderer.renderComboUI === 'function') {
-      this.renderer.renderComboUI(this.combo);
+      const isMobile = this.touchControls && this.touchControls.isMobile;
+      this.renderer.renderComboUI(this.combo, isMobile ? 40 : 0);
     }
 
     // Item tooltips
@@ -1000,19 +1005,25 @@ class Game {
       this.renderer.renderScreenFlash(this.screenEffects);
     }
 
-    // Tutorial hints
+    // Tutorial hints (map tracking booleans to show-* properties)
     if (typeof this.renderer.renderTutorialHints === 'function') {
-      this.renderer.renderTutorialHints(this.tutorialState, this.touchControls && this.touchControls.isMobile);
+      const hints = {
+        showMove: !this.tutorialState.moved,
+        showShoot: this.tutorialState.moved && !this.tutorialState.shot,
+        showDash: this.tutorialState.shot && !this.tutorialState.dashed,
+        showPickup: this.tutorialState.dashed && this.tutorialState.itemSeen
+      };
+      this.renderer.renderTutorialHints(hints, this.touchControls && this.touchControls.isMobile);
     }
 
-    // Touch controls overlay (before postfx)
-    if (this.touchControls && this.touchControls.isMobile) {
+    // Touch controls overlay (before postfx, only during gameplay)
+    if (this.touchControls && this.touchControls.isMobile && this.state === GameState.PLAYING) {
       this.touchControls.render(this.renderer.ctx, this.player);
     }
 
     // AI Narrator box
     if (this.ai) {
-      this.renderer.renderNarrator(this.ai);
+      this.renderer.renderNarrator(this.ai, hudOffset);
     }
 
     // Lore text overlay (on biome transition)

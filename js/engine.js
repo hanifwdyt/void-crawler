@@ -138,21 +138,28 @@ class Input {
     this._prevMouse = this.mouseDown;
 
     if (this.touchControls) {
-      this.touchControls.update();
-      // Merge aim stick into mouse position
-      if (this.touchControls.aimStick.active) {
-        const a = this.touchControls.aimStick.angle;
-        this.mouseX = this.canvas.width / 2 + Math.cos(a) * 200;
-        this.mouseY = this.canvas.height / 2 + Math.sin(a) * 200;
-      }
-      // Merge shooting
-      if (this.touchControls.aimStick.isShooting) {
-        this.mouseDown = true;
-      }
-      // Any touch = mouseJustPressed (for menus)
+      // Tap detection for menus — always works regardless of enabled
       if (this.touchControls._anyTouchStarted) {
         this.mouseJustPressed = true;
         this.touchControls._anyTouchStarted = false;
+      }
+
+      this.touchControls.update();
+
+      if (this.touchControls.enabled) {
+        // On mobile, mouseDown driven exclusively by aim stick (assignment, not |=)
+        if (this.touchControls.isMobile) {
+          this.mouseDown = this.touchControls.aimStick.isShooting;
+        } else if (this.touchControls.aimStick.isShooting) {
+          this.mouseDown = true;
+        }
+
+        // Aim stick → mouse position
+        if (this.touchControls.aimStick.active) {
+          const a = this.touchControls.aimStick.angle;
+          this.mouseX = this.canvas.width / 2 + Math.cos(a) * 200;
+          this.mouseY = this.canvas.height / 2 + Math.sin(a) * 200;
+        }
       }
     }
   }
@@ -169,6 +176,7 @@ class Input {
     if (!this.touchControls) return false;
     if (key === 'escape' && this.touchControls.pauseButton.justPressed) return true;
     if (key === 'e' && this.touchControls.interactButton.justPressed) return true;
+    if (key === ' ' && this.touchControls.dashButton.justPressed) return true;
     return false;
   }
 

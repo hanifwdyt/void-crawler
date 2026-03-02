@@ -1482,13 +1482,13 @@ class Renderer {
   }
 
   // ---- Combo UI ----
-  renderComboUI(combo) {
+  renderComboUI(combo, xOffset = 0) {
     if (!combo) return;
     const ctx = this.ctx;
     const w = this.canvas.width;
     const scoreScale = combo.scorePopTimer > 0 ? 1 + combo.scorePopTimer * 0.5 : 1;
     ctx.save();
-    ctx.translate(80, 30);
+    ctx.translate(80 + xOffset, 30);
     ctx.scale(scoreScale, scoreScale);
     ctx.fillStyle = COLORS.comboText;
     ctx.font = 'bold 16px monospace';
@@ -1898,7 +1898,7 @@ class Renderer {
   }
 
   // ---- AI Narrator Box ----
-  renderNarrator(aiManager) {
+  renderNarrator(aiManager, mobileOffset = 0) {
     if (!aiManager || !aiManager.narratorText) return;
     const alpha = aiManager.getNarratorAlpha();
     if (alpha <= 0) return;
@@ -1910,7 +1910,7 @@ class Renderer {
     const boxW = Math.min(600, w * 0.6);
     const boxH = 50;
     const boxX = (w - boxW) / 2;
-    const boxY = h - 130;
+    const boxY = h - 130 - mobileOffset;
 
     ctx.save();
     ctx.globalAlpha = alpha;

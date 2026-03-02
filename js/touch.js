@@ -21,15 +21,17 @@ class TouchControls {
       active: false, touchId: null,
       centerX: 0, centerY: 0,
       currentX: 0, currentY: 0,
-      angle: 0, magnitude: 0, isShooting: false
+      angle: 0, magnitude: 0, isShooting: false,
+      maxRadius: 50
     };
 
-    // Buttons
-    this.dashButton = { pressed: false, justPressed: false, _prev: false };
-    this.interactButton = { pressed: false, justPressed: false, _prev: false, visible: false };
-    this.pauseButton = { pressed: false, justPressed: false, _prev: false };
+    // Buttons (track touch ID per button for multi-touch)
+    this.dashButton = { pressed: false, justPressed: false, _prev: false, _touchId: null };
+    this.interactButton = { pressed: false, justPressed: false, _prev: false, visible: false, _touchId: null };
+    this.pauseButton = { pressed: false, justPressed: false, _prev: false, _touchId: null };
 
     this._anyTouchStarted = false;
+    this.enabled = true;
 
     // Layout (computed on resize)
     this.layout = {};
@@ -45,6 +47,7 @@ class TouchControls {
     const h = this.canvas.height;
 
     this.moveJoystick.maxRadius = Math.min(50, w * 0.06);
+    this.aimStick.maxRadius = Math.min(50, w * 0.06);
 
     this.layout = {
       // Move zone: left 40%, bottom 70%
@@ -103,19 +106,25 @@ class TouchControls {
 
       if (this._hitCircle(pos.x, pos.y, pauseBtn.x, pauseBtn.y, pauseBtn.r + 10)) {
         this.pauseButton.pressed = true;
+        this.pauseButton._touchId = id;
         continue;
       }
 
       if (this._hitCircle(pos.x, pos.y, dashBtn.x, dashBtn.y, dashBtn.r + 10)) {
         this.dashButton.pressed = true;
+        this.dashButton._touchId = id;
         continue;
       }
 
       if (this.interactButton.visible &&
           this._hitCircle(pos.x, pos.y, interactBtn.x, interactBtn.y, interactBtn.r + 10)) {
         this.interactButton.pressed = true;
+        this.interactButton._touchId = id;
         continue;
       }
+
+      // Dead zone — ignore touches in middle strip
+      if (this._inRect(pos.x, pos.y, this.layout.deadZone)) continue;
 
       // Move joystick — left zone
       if (!this.moveJoystick.active && this._inRect(pos.x, pos.y, this.layout.moveZone)) {
@@ -196,28 +205,19 @@ class TouchControls {
         this.aimStick.magnitude = 0;
         continue;
       }
-    }
 
-    // Buttons release — check if any remaining touches still on buttons
-    this.dashButton.pressed = false;
-    this.interactButton.pressed = false;
-    this.pauseButton.pressed = false;
-
-    // Re-check any remaining touches for button hold
-    for (let i = 0; i < e.touches.length; i++) {
-      const touch = e.touches[i];
-      const pos = this._getTouchPos(touch);
-      const { dashBtn, interactBtn, pauseBtn } = this.layout;
-
-      if (this._hitCircle(pos.x, pos.y, dashBtn.x, dashBtn.y, dashBtn.r + 10)) {
-        this.dashButton.pressed = true;
+      // Buttons — release only when the specific touch that pressed it ends
+      if (this.dashButton._touchId === id) {
+        this.dashButton.pressed = false;
+        this.dashButton._touchId = null;
       }
-      if (this.interactButton.visible &&
-          this._hitCircle(pos.x, pos.y, interactBtn.x, interactBtn.y, interactBtn.r + 10)) {
-        this.interactButton.pressed = true;
+      if (this.interactButton._touchId === id) {
+        this.interactButton.pressed = false;
+        this.interactButton._touchId = null;
       }
-      if (this._hitCircle(pos.x, pos.y, pauseBtn.x, pauseBtn.y, pauseBtn.r + 10)) {
-        this.pauseButton.pressed = true;
+      if (this.pauseButton._touchId === id) {
+        this.pauseButton.pressed = false;
+        this.pauseButton._touchId = null;
       }
     }
   }
@@ -229,8 +229,15 @@ class TouchControls {
     const maxR = stick.maxRadius;
     const clampedDist = Math.min(distance, maxR);
     const a = Math.atan2(rawDy, rawDx);
-    stick.dx = distance > 0 ? (clampedDist / maxR) * Math.cos(a) : 0;
-    stick.dy = distance > 0 ? (clampedDist / maxR) * Math.sin(a) : 0;
+    const DEAD_ZONE = 0.15;
+    if (distance / maxR < DEAD_ZONE) {
+      stick.dx = 0;
+      stick.dy = 0;
+      return;
+    }
+    const normalized = (clampedDist / maxR - DEAD_ZONE) / (1 - DEAD_ZONE);
+    stick.dx = normalized * Math.cos(a);
+    stick.dy = normalized * Math.sin(a);
   }
 
   _computeAimStick() {
@@ -238,13 +245,20 @@ class TouchControls {
     const rawDx = stick.currentX - stick.centerX;
     const rawDy = stick.currentY - stick.centerY;
     const distance = Math.hypot(rawDx, rawDy);
-    const maxR = this.moveJoystick.maxRadius; // same radius
+    const maxR = stick.maxRadius;
     stick.angle = Math.atan2(rawDy, rawDx);
     stick.magnitude = Math.min(distance, maxR) / maxR;
     stick.isShooting = distance > 10; // deadzone
   }
 
   update() {
+    if (!this.enabled) {
+      this.dashButton.justPressed = false;
+      this.interactButton.justPressed = false;
+      this.pauseButton.justPressed = false;
+      return;
+    }
+
     // Just-pressed detection
     this.dashButton.justPressed = this.dashButton.pressed && !this.dashButton._prev;
     this.dashButton._prev = this.dashButton.pressed;
@@ -261,6 +275,7 @@ class TouchControls {
 
     const { dashBtn, interactBtn, pauseBtn } = this.layout;
     const maxR = this.moveJoystick.maxRadius;
+    const aimMaxR = this.aimStick.maxRadius;
 
     // Move joystick (only when active)
     if (this.moveJoystick.active) {
@@ -290,12 +305,12 @@ class TouchControls {
       ctx.strokeStyle = COLORS.projectile;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(as.centerX, as.centerY, maxR, 0, Math.PI * 2);
+      ctx.arc(as.centerX, as.centerY, aimMaxR, 0, Math.PI * 2);
       ctx.stroke();
       // Direction line
       if (as.isShooting) {
-        const lineX = as.centerX + Math.cos(as.angle) * maxR * as.magnitude;
-        const lineY = as.centerY + Math.sin(as.angle) * maxR * as.magnitude;
+        const lineX = as.centerX + Math.cos(as.angle) * aimMaxR * as.magnitude;
+        const lineY = as.centerY + Math.sin(as.angle) * aimMaxR * as.magnitude;
         ctx.globalAlpha = 0.3;
         ctx.strokeStyle = COLORS.projectile;
         ctx.lineWidth = 2;
@@ -305,8 +320,8 @@ class TouchControls {
         ctx.stroke();
       }
       // Inner thumb
-      const thumbX = as.centerX + Math.cos(as.angle) * maxR * as.magnitude;
-      const thumbY = as.centerY + Math.sin(as.angle) * maxR * as.magnitude;
+      const thumbX = as.centerX + Math.cos(as.angle) * aimMaxR * as.magnitude;
+      const thumbY = as.centerY + Math.sin(as.angle) * aimMaxR * as.magnitude;
       ctx.globalAlpha = 0.4;
       ctx.fillStyle = COLORS.projectile;
       ctx.beginPath();
