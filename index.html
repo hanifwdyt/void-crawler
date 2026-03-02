@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>VOID CRAWLER</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #05050a;
+      overflow: hidden;
+      cursor: crosshair;
+      font-family: 'Courier New', monospace;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    canvas#game {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      touch-action: none;
+    }
+    @media (hover: none) and (pointer: coarse) {
+      body { cursor: default; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <script src="js/touch.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/ai-config.js"></script>
+  <script src="js/biome.js"></script>
+  <script src="js/postfx.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
