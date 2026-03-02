@@ -123,9 +123,6 @@ class TouchControls {
         continue;
       }
 
-      // Dead zone — ignore touches in middle strip
-      if (this._inRect(pos.x, pos.y, this.layout.deadZone)) continue;
-
       // Move joystick — left zone
       if (!this.moveJoystick.active && this._inRect(pos.x, pos.y, this.layout.moveZone)) {
         this.moveJoystick.active = true;
